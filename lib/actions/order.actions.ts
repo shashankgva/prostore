@@ -8,11 +8,12 @@ import { getUserById } from './user.actions';
 import { redirect } from 'next/dist/server/api-utils';
 import { insertOrderSchema } from '../validators';
 import { PrismaClient } from '../generated/prisma/client';
-import { CartItem, PaymentResult } from '@/types';
+import { CartItem, PaymentResult, ShippingAddress } from '@/types';
 import { paypal } from '../paypal';
 import { revalidatePath } from 'next/cache';
 import { PAGE_SIZE } from '../constants';
 import { Prisma } from '../generated/prisma';
+import { sendPurchaseReceipt } from '@/email';
 
 // Create order and order items
 export async function createOrder() {
@@ -208,7 +209,7 @@ export async function approvePayPalOrder(
   }
 }
 
-async function updateOrderToPaid({
+export async function updateOrderToPaid({
   orderId,
   paymentResult,
 }: {
@@ -265,6 +266,14 @@ async function updateOrderToPaid({
   });
 
   if (!updatedOrder) throw new Error('Order not updated');
+
+  sendPurchaseReceipt({
+    order: {
+      ...updatedOrder,
+      shippingAddress: updatedOrder.shippingAddress as ShippingAddress,
+      paymentResult: updatedOrder.paymentResult as PaymentResult,
+    },
+  });
 }
 
 export async function getMyOrders({
